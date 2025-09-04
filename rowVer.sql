@@ -1,0 +1,5 @@
+-- Añadimos los ROWVERSION
+
+ALTER TABLE dbo.Clientes  ADD RowVer ROWVERSION NOT NULL;
+ALTER TABLE dbo.Productos ADD RowVer ROWVERSION NOT NULL;
+
