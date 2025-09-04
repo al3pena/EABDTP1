@@ -58,7 +58,7 @@ DECLARE @Total DECIMAL(18,2) = @Cantidad * @Precio;
 --Actualizamos el saldo en Cta Cte.
 UPDATE dbo.Clientes
 SET SaldoCtaCte = SaldoCtaCte + @Total
-WHERE ClienteID = @ClienteID AND RowVer = @ProdVer;
+WHERE ClienteID = @ClienteID AND RowVer = @CliVersion;
 
 IF @@ROWCOUNT <> 1
 BEGIN
