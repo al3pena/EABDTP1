@@ -1,0 +1,35 @@
+Table Clientes {
+  ClienteID    bigserial [pk]
+  Nombre       varchar(120) [not null]
+  Email        varchar(160) [not null, unique]
+  Direccion    varchar(160) [not null]
+  Contacto     varchar(160)
+  SaldoCtaCte      numeric(14,2) [not null]
+  CreditoMaximo    numeric(14,2) [not null]
+  }
+
+Table Productos {
+  ProductoID   bigserial [pk]
+  Nombre       varchar(160) [not null]
+  PrecioLista  numeric(14,2) [not null]
+  CantidadStock int [not null]
+  FechaUltActual timestamp [not null, default: 'now()']
+}
+
+Table Ventas {
+  VentaID      bigserial [pk]
+  FechaVenta   timestamp [not null, default: `now()`]
+  ClienteID    bigint [not null, ref: > Clientes.ClienteID]
+}
+
+Table Detalle_Venta {
+  VentaID        bigint [not null, ref: > Ventas.VentaID]
+  ProductoID     bigint [not null, ref: > Productos.ProductoID]
+  Cantidad       numeric(12,2) [not null]
+  PrecioUnitario numeric(14,2) [not null]
+  Indexes {
+    (VentaID, ProductoID) [pk]
+    (VentaID)
+    (ProductoID)
+  }
+}
