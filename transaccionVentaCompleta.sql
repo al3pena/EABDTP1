@@ -43,6 +43,17 @@ DECLARE @VentaID BIGINT = CAST(SCOPE_IDENTITY() AS BIGINT);
 INSERT INTO dbo.Detalle_Venta (VentaID, ProductoID, Cantidad, PrecioUnitario)
 VALUES (@VentaID, @ProductoID, @Cantidad, @Precio);
 
+
+--SIMULAMOS FALLO!
+DECLARE @FALLO BIT = 1;
+
+IF @FALLO = 1
+BEGIN
+  ROLLBACK;
+  THROW 99999, 'Fallo simulado para probar ROLLBACK.', 1;
+END
+
+
 -- Descuento de stock
 UPDATE dbo.Productos
 SET CantidadStock = CantidadStock - @Cantidad,
