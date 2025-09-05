@@ -9,26 +9,23 @@ DECLARE @ClienteID  BIGINT = (SELECT ClienteID  FROM dbo.Clientes  WHERE Email='
 DECLARE @ProductoID BIGINT = (SELECT ProductoID FROM dbo.Productos WHERE Nombre='Parlante Bluetooth');
 DECLARE @Cantidad   DECIMAL(18,2) = 8.00;
 
+--Ahora necesitamos los tokens de version
+DECLARE @CliVersion VARBINARY(8);
+DECLARE @Precio DECIMAL(14,2);
+DECLARE @ProdVer VARBINARY(8);
+
 --Hace que cualquier error antes del BEGIN TRAN cause automáticamente ROLLBACK
 SET XACT_ABORT ON;
 
 --Comeinza la tx
 BEGIN TRAN;
 
--- ===== Concurrencia pesimista (FOR UPDATE) =====
--- Bloquea la fila del cliente para la posterior actualización del saldo
--- Usamos UPDLOCK para bloquear la fila, y HOLD para mantenerlo hasta que commitee la TX
-SELECT 1
-FROM dbo.Clientes WITH (UPDLOCK, HOLDLOCK)
-WHERE ClienteID = @ClienteID;
+--################################################################################################
+-- Leemos el RowVer sin bloquear, como una lectura más.
+SELECT @CliVersion = RowVer FROM dbo.Clientes WHERE ClienteID = @ClienteID;
 
--- Tomamos el precio y bloquea la fila del producto para el posterior descuento de stock
-DECLARE @Precio DECIMAL(14,2);
-SELECT @Precio = PrecioLista
-FROM dbo.Productos WITH (UPDLOCK, HOLDLOCK)
-WHERE ProductoID = @ProductoID;
--- =============================================================
-
+SELECT @Precio = PrecioLista, @ProdVer = RowVer FROM dbo.Productos WHERE ProductoID = @ProductoID 
+--################################################################################################
 
 -- Cabecera
 INSERT INTO dbo.Ventas (FechaVenta, ClienteID)
@@ -43,22 +40,17 @@ DECLARE @VentaID BIGINT = CAST(SCOPE_IDENTITY() AS BIGINT);
 INSERT INTO dbo.Detalle_Venta (VentaID, ProductoID, Cantidad, PrecioUnitario)
 VALUES (@VentaID, @ProductoID, @Cantidad, @Precio);
 
-
---SIMULAMOS FALLO!
-DECLARE @FALLO BIT = 1;
-
-IF @FALLO = 1
-BEGIN
-  ROLLBACK;
-  THROW 99999, 'Fallo simulado para probar ROLLBACK.', 1;
-END
-
-
--- Descuento de stock
+-- Descuento de stock, pero agrego el AND para ver si la versión coincide.
 UPDATE dbo.Productos
 SET CantidadStock = CantidadStock - @Cantidad,
     FechaUltActual = SYSDATETIME()
-WHERE ProductoID = @ProductoID;
+WHERE ProductoID = @ProductoID AND RowVer = @ProdVer
+
+IF @@ROWCOUNT <> 1
+BEGIN
+    ROLLBACK;
+    THROW 99001, 'RowVer cambió Producto!!!!', 1;
+END
 
 -- Total y actualización del saldo del cliente con p*q
 DECLARE @Total DECIMAL(18,2) = @Cantidad * @Precio;
@@ -66,7 +58,13 @@ DECLARE @Total DECIMAL(18,2) = @Cantidad * @Precio;
 --Actualizamos el saldo en Cta Cte.
 UPDATE dbo.Clientes
 SET SaldoCtaCte = SaldoCtaCte + @Total
-WHERE ClienteID = @ClienteID;
+WHERE ClienteID = @ClienteID AND RowVer = @CliVersion;
+
+IF @@ROWCOUNT <> 1
+BEGIN
+    ROLLBACK;
+    THROW 99002, 'RowVer cambió!! Cliente!!', 1;
+END
 
 COMMIT;
 
